@@ -1,123 +1,83 @@
-// Vercel Serverless API Route - Chat with Mike Ops
-// This runs as a serverless function on Vercel (free tier)
+// Vercel Serverless API Route - Chat with Mike Ops via Supabase
+// Dashboard sends message → saved to Supabase → local connector picks it up → sends to Mike Ops → saves response
 
-const WebSocket = require('ws');
+const { createClient } = require('@supabase/supabase-js');
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://uyaepyidfwkypjvsxzae.supabase.co';
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5YWVweWlkZndreXBqdnN4emFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MDYxODYsImV4cCI6MjA5MjE4MjE4Nn0.i1qnxJeYDB9ON_7cGT7NDm2dOAysCDQL0bM1r__EPKA';
+
+const SESSION_ID = 'heymike-demo-session';
 
 export default async function handler(req, res) {
-  // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { message, userId } = req.body;
+  const { message } = req.body;
 
   if (!message) {
     return res.status(400).json({ error: 'Message required' });
   }
 
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
   try {
-    // Connect to Mike Ops gateway
-    const gatewayUrl = process.env.GATEWAY_WS || 'ws://127.0.0.1:18789';
-    const gatewayToken = process.env.GATEWAY_TOKEN || 'c44ab285ccbfe292e660a65029766dd74966aad5f9f43361';
+    // Save user message to Supabase
+    const { error: insertError } = await supabase
+      .from('demo_messages')
+      .insert({
+        session_id: SESSION_ID,
+        sender: 'user',
+        content: message,
+        processed: false
+      });
 
-    // For serverless, we can't hold WebSocket open - use polling fallback
-    // In production, you'd use a message queue (Redis, Supabase Realtime, etc.)
-    
-    // For now, return a response indicating MCP is being set up
-    const response = await callMikeOps(message, gatewayUrl, gatewayToken);
+    if (insertError) throw insertError;
 
+    // Wait for response (poll for up to 15 seconds)
+    let attempts = 0;
+    const maxAttempts = 30; // 30 * 500ms = 15 seconds
+
+    while (attempts < maxAttempts) {
+      await new Promise(r => setTimeout(r, 500));
+
+      const { data: responses, error: selectError } = await supabase
+        .from('demo_messages')
+        .select('*')
+        .eq('session_id', SESSION_ID)
+        .eq('sender', 'assistant')
+        .eq('processed', true)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (selectError) throw selectError;
+
+      if (responses && responses.length > 0) {
+        const response = responses[0];
+
+        // Mark as read (delete it)
+        await supabase
+          .from('demo_messages')
+          .delete()
+          .eq('id', response.id);
+
+        return res.status(200).json({
+          success: true,
+          response: response.content
+        });
+      }
+
+      attempts++;
+    }
+
+    // No response after 15 seconds
     return res.status(200).json({
       success: true,
-      response: response,
-      userId: userId || 'demo'
+      response: "I'm processing your request... The local connector might not be running. Make sure to run 'node local-connector.js' on your machine."
     });
 
   } catch (error) {
     console.error('Chat error:', error);
-    
-    // Fallback response when MCP isn't connected
-    return res.status(200).json({
-      success: true,
-      response: getFallbackResponse(message),
-      userId: userId || 'demo',
-      note: 'MCP not yet connected'
-    });
+    return res.status(500).json({ error: error.message });
   }
-}
-
-// Call Mike Ops via WebSocket gateway
-function callMikeOps(message, gatewayUrl, gatewayToken) {
-  return new Promise((resolve, reject) => {
-    try {
-      const ws = new WebSocket(gatewayUrl, {
-        headers: { 'Authorization': `Bearer ${gatewayToken}` }
-      });
-
-      const requestId = crypto.randomBytes(16).toString('hex');
-      let responseData = '';
-
-      const timeout = setTimeout(() => {
-        ws.close();
-        reject(new Error('Gateway timeout'));
-      }, 30000);
-
-      ws.on('open', () => {
-        const toolCall = JSON.stringify({
-          jsonrpc: '2.0',
-          id: requestId,
-          method: 'tools/call',
-          params: {
-            name: 'anthropic_messages_create',
-            arguments: {
-              model: 'minimax-portal/MiniMax-M2.7',
-              max_tokens: 1024,
-              messages: [{ role: 'user', content: message }]
-            }
-          }
-        });
-        ws.send(toolCall);
-      });
-
-      ws.on('message', (data) => {
-        responseData += data.toString();
-        try {
-          const response = JSON.parse(responseData);
-          if (response.id === requestId) {
-            clearTimeout(timeout);
-            ws.close();
-            resolve(response.result?.content?.[0]?.text || 'Processed');
-          }
-        } catch (e) {
-          // Wait for more data
-        }
-      });
-
-      ws.on('error', (err) => {
-        clearTimeout(timeout);
-        reject(err);
-      });
-
-    } catch (e) {
-      reject(e);
-    }
-  });
-}
-
-// Fallback responses when MCP isn't connected
-function getFallbackResponse(message) {
-  const lower = message.toLowerCase();
-  
-  if (lower.includes('campaign')) {
-    return "I'd love to create a campaign for you! Unfortunately the MCP connection isn't set up yet. Once connected, I'll be able to generate full campaigns with ads, targeting, and scheduling.\n\nFor now, what's the campaign goal and target audience?";
-  }
-  
-  if (lower.includes('ad') || lower.includes('content')) {
-    return "I can generate amazing ad content for you! Meta, LinkedIn, Google - all supported. The MCP connection will let me create production-ready ads.\n\nWhat platform and product/service should I create ads for?";
-  }
-  
-  if (lower.includes('help')) {
-    return "I'm HeyMike, your AI Marketing Director! I can:\n\n• Create marketing campaigns\n• Generate ad creatives\n• Write email sequences\n• Research competitors\n• Plan content calendars\n\nWhat's your first project?";
-  }
-  
-  return "I'm here and ready to help! The MCP connection is being set up for full AI capabilities. In the meantime, tell me about your marketing project and I'll guide you through the process.";
 }

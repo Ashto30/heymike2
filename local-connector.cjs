@@ -1,5 +1,6 @@
-// HeyMike Local Connector v5
+// HeyMike Local Connector v6
 // Uses direct CLI to send messages to Mike Ops
+// Explicitly sets config path to Mike Ops config
 //
 // Keep this running while you use HeyMike dashboard
 
@@ -10,6 +11,8 @@ const { spawn } = require('child_process');
 const SUPABASE_URL = 'https://uyaepyidfwkypjvsxzae.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5YWVweWlkZndreXBqdnN4emFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MDYxODYsImV4cCI6MjA5MjE4MjE4Nn0.i1qnxJeYDB9ON_7cGT7NDm2dOAysCDQL0bM1r__EPKA';
 const SESSION_ID = 'heymike-demo-session';
+
+// Mike Ops specific config
 const MIKE_CONFIG = '/Users/ash/.openclaw/openclaw-mike.json';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -17,8 +20,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let isProcessing = false;
 
 console.log('╔══════════════════════════════════════════╗');
-console.log('║  HeyMike Local Connector v5            ║');
-console.log('║  Mike Ops - Workspace-mike            ║');
+console.log('║  HeyMike Local Connector v6            ║');
+console.log('║  Explicitly using Mike Ops config     ║');
 console.log('╚══════════════════════════════════════════╝\n');
 
 // Send to Mike Ops via CLI
@@ -26,12 +29,21 @@ function sendToMikeOps(message) {
   return new Promise((resolve, reject) => {
     console.log('🤖 Sending to Mike Ops via CLI...');
     
+    // Create clean env with explicit config path
+    const env = {
+      HOME: process.env.HOME,
+      USER: process.env.USER,
+      PATH: process.env.PATH,
+      OPENCLAW_CONFIG_PATH: MIKE_CONFIG,
+      OPENCLAW_GATEWAY_PORT: '18790'
+    };
+    
     const proc = spawn('openclaw', [
       'agent',
       '--agent', 'main',
       '--message', message
     ], {
-      env: { ...process.env, OPENCLAW_CONFIG_PATH: MIKE_CONFIG },
+      env: env,
       timeout: 30000
     });
 

@@ -1,105 +1,56 @@
 import { useState, useRef, useEffect } from 'react'
 import HeyMikeIcon from '../components/HeyMikeIcon'
 
-// Conversation states
-const STATES = {
-  WELCOME: 'welcome',
-  AWAITING_PLATFORM: 'awaiting_platform',
-  AWAITING_GOAL: 'awaiting_goal', 
-  AWAITING_AUDIENCE: 'awaiting_audience',
-  BUILDING_CAMPAIGN: 'building',
-  CREATING_CONTENT: 'creating',
-  READY: 'ready'
+// Campaign context stored during conversation
+const CampaignContext = {
+  platform: '',
+  goal: '',
+  audience: '',
+  brand: '',
+  budget: ''
 }
 
-// Generate smart response based on state and message and context
-const getResponse = (state, userMessage, context = {}) => {
-  const lower = userMessage.toLowerCase()
+// Simulated campaign generation (replaces MCP for now)
+const generateCampaign = (context) => {
+  const { platform, goal, audience, brand } = context
   
-  // Handle welcome state
-  if (state === STATES.WELCOME) {
-    if (lower.includes('campaign')) {
-      return { text: "Let's create a campaign! First question:\n\n**What platform?** (Meta, LinkedIn, Google, or All)", nextState: STATES.AWAITING_PLATFORM }
-    }
-    if (lower.includes('content') || lower.includes('ad') || lower.includes('creative')) {
-      return { text: "What type of content?\n\n• Social media posts\n• Google display ads\n• Email sequences\n• Video scripts\n\nJust say the type and I'll get to work!", nextState: STATES.CREATING_CONTENT }
-    }
-    if (lower.includes('help')) {
-      return { text: "Here's what I can do:\n\n**Campaigns** - Tell me 'create a campaign' and I'll build one for you\n**Content** - Say 'generate ads' or 'write emails'\n**Research** - Ask about competitors or market\n**Calendar** - Plan your content schedule\n\nWhat would you like to tackle?", nextState: STATES.READY }
-    }
-    return { text: "I'm ready to help! You can:\n\n• **Create a campaign** - Just say 'create campaign'\n• **Generate content** - Say 'generate ads' or 'write emails'\n• **Research** - Ask about competitors\n\nWhat shall we work on?", nextState: STATES.READY }
-  }
-  
-  // Handle platform selection
-  if (state === STATES.AWAITING_PLATFORM) {
-    if (lower.includes('meta') || lower.includes('facebook') || lower.includes('instagram')) {
-      return { text: "Great! **Meta (Facebook/Instagram)** selected.\n\n**What's the campaign goal?**\n• Brand Awareness\n• Lead Generation\n• Sales\n• Website Traffic", nextState: STATES.AWAITING_GOAL, context: { platform: 'Meta' } }
-    }
-    if (lower.includes('linkedin')) {
-      return { text: "Great! **LinkedIn** selected.\n\n**What's the campaign goal?**\n• Brand Awareness\n• Lead Generation\n• Website Traffic\n• Job Applications", nextState: STATES.AWAITING_GOAL, context: { platform: 'LinkedIn' } }
-    }
-    if (lower.includes('google')) {
-      return { text: "Great! **Google Ads** selected.\n\n**What's the campaign goal?**\n• Brand Awareness\n• Leads\n• Sales\n• Website Traffic", nextState: STATES.AWAITING_GOAL, context: { platform: 'Google' } }
-    }
-    if (lower.includes('all')) {
-      return { text: "Great! **All Platforms** selected.\n\n**What's the campaign goal?**\n• Brand Awareness\n• Lead Generation\n• Sales\n• Website Traffic", nextState: STATES.AWAITING_GOAL, context: { platform: 'All' } }
-    }
-    return { text: "I didn't catch that. Which platform? (Meta, LinkedIn, Google, or All)", nextState: STATES.AWAITING_PLATFORM }
-  }
-  
-  // Handle goal selection
-  if (state === STATES.AWAITING_GOAL) {
-    const platform = context.platform || 'Meta'
-    if (lower.includes('brand') || lower.includes('awareness')) {
-      return { text: `**Brand Awareness** - Perfect for B2B!\n\n**Who's your target audience?**\n• Hotels & Resorts\n• Schools & Universities\n• Hospitals\n• Corporate offices\n• Or describe your own...`, nextState: STATES.AWAITING_AUDIENCE, context: { platform, goal: 'Brand Awareness' } }
-    }
-    if (lower.includes('lead') || lower.includes('generation')) {
-      return { text: `**Lead Generation** - Great choice!\n\n**Who's your target audience?**\n• Hotels & Resorts\n• Schools & Universities\n• Hospitals\n• Corporate offices\n• Or describe your own...`, nextState: STATES.AWAITING_AUDIENCE, context: { platform, goal: 'Lead Generation' } }
-    }
-    if (lower.includes('sales') || lower.includes('conversion')) {
-      return { text: `**Sales** - Let's drive revenue!\n\n**Who's your target audience?**\n• Hotels & Resorts\n• Schools & Universities\n• Hospitals\n• Corporate offices\n• Or describe your own...`, nextState: STATES.AWAITING_AUDIENCE, context: { platform, goal: 'Sales' } }
-    }
-    return { text: "What's the goal? (Brand Awareness, Lead Generation, Sales, or Website Traffic)", nextState: STATES.AWAITING_GOAL }
-  }
-  
-  // Handle audience selection - NOW WE BUILD
-  if (state === STATES.AWAITING_AUDIENCE) {
-    return { 
-      text: `Perfect! I've got everything I need to create your campaign:\n\n**Platform:** Meta (Facebook/Instagram)\n**Goal:** Brand Awareness + Lead Gen\n**Audience:** ${userMessage}\n\nStarting to build your campaign now... I'll have ads ready for review shortly! 🎯`, 
-      nextState: STATES.BUILDING_CAMPAIGN,
-      action: 'create_campaign'
-    }
-  }
-  
-  // Building state - take action
-  if (state === STATES.BUILDING_CAMPAIGN) {
-    return { 
-      text: "Your campaign is being built! Check the **Campaigns** page to see progress, and **Content** page for generated ads to review.\n\nWant me to:\n• Generate specific ad variations?\n• Write email follow-ups?\n• Analyze competitor ads?", 
-      nextState: STATES.READY 
-    }
-  }
-  
-  // Creating content
-  if (state === STATES.CREATING_CONTENT) {
-    return { 
-      text: `Got it! I'll generate ${userMessage} for you.\n\nCheck the **Content** page in a moment to see the generated content ready for review. I'll create multiple variations so you can pick the best!\n\nAnything else you need?`,
-      nextState: STATES.READY,
-      action: 'generate_content'
-    }
-  }
-  
-  // Ready state - but check for key intents first
-  if (lower.includes('campaign') && (lower.includes('create') || lower.includes('start') || lower.includes('new'))) {
-    return { text: "Let's create a campaign! First question:\n\n**What platform?** (Meta, LinkedIn, Google, or All)", nextState: STATES.AWAITING_PLATFORM }
-  }
-  if (lower.includes('content') || lower.includes('ad') || lower.includes('creative')) {
-    return { text: "What type of content?\n\n• Social media posts\n• Google display ads\n• Email sequences\n• Video scripts\n\nJust say the type and I'll get to work!", nextState: STATES.CREATING_CONTENT }
-  }
-  
-  return { 
-    text: "I'm ready! Here's what I can do:\n\n**Campaigns** - Say 'create campaign' to start fresh\n**Content** - Say 'generate ads' or 'write emails'\n**Research** - Ask about competitors\n**Calendar** - Plan your schedule\n\nJust tell me what you need!", 
-    nextState: STATES.READY 
-  }
+  return `
+🎯 **Campaign Generated**
+
+**Platform:** ${platform || 'Meta'}
+**Goal:** ${goal || 'Brand Awareness + Lead Gen'}
+**Audience:** ${audience || 'Hotels, Schools, Corporate offices'}
+
+---
+
+**📅 Campaign Structure (14 Days)**
+
+**Week 1 - Awareness**
+• Day 1-2: Video ad - Brand story
+• Day 3-4: Carousel - Services showcase  
+• Day 5-7: Lead gen form ad
+
+**Week 2 - Nurture**
+• Day 8-10: Retargeting video
+• Day 11-12: Testimonial carousel
+• Day 13-14: Final conversion push
+
+---
+
+**📝 Ad Copy Ready:**
+
+**Ad 1 - Video Hook:**
+"Play areas that transform spaces. Hotels, schools, communities - we design adventure."
+
+**Ad 2 - Lead Gen:**
+"Get a free site survey for your play area. No obligation, just ideas."
+
+**Ad 3 - Carousel:**
+3-image carousel showing before/after transformations
+
+---
+
+All content ready for your review. Say **"launch it"** to start posting, or **"edit"** to make changes.`
 }
 
 // Message bubble component
@@ -124,7 +75,7 @@ const MessageBubble = ({ text, isUser, time }) => (
         <HeyMikeIcon name="heymikeLogo" size={20} />
       </div>
     )}
-    <div style={{ maxWidth: '68%' }}>
+    <div style={{ maxWidth: '72%' }}>
       <div style={{
         padding: '14px 18px',
         borderRadius: isUser ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
@@ -133,13 +84,9 @@ const MessageBubble = ({ text, isUser, time }) => (
         fontSize: '14px',
         lineHeight: '1.6',
         boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+        whiteSpace: 'pre-wrap',
       }}>
-        {text.split('\n').map((line, i) => (
-          <div key={i} style={{ marginBottom: i < text.split('\n').length - 1 ? '8px' : 0 }}>
-            {line.startsWith('•') ? <span style={{ marginLeft: '12px' }}>{line}</span> : 
-             line.startsWith('**') ? <strong>{line.replace(/\*\*/g, '')}</strong> : line}
-          </div>
-        ))}
+        {text}
       </div>
       <span style={{
         fontSize: '11px',
@@ -174,12 +121,12 @@ const MessageBubble = ({ text, isUser, time }) => (
 // Chat View
 const ChatView = () => {
   const [messages, setMessages] = useState([
-    { text: "Hey! I'm HeyMike, your AI Marketing Director. 👋\n\nI can help you create campaigns, generate ads, write emails, and more.\n\nWhat would you like to work on today?", isUser: false, time: 'Just now' },
+    { text: "Hey! I'm Mike Ops, your AI Marketing Director.\n\nJust tell me what you want to build - campaigns, ads, content - and I'll handle the rest. You approve, I create.\n\nWhat are we building today?", isUser: false, time: 'Just now' },
   ])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
-  const [conversationState, setConversationState] = useState(STATES.WELCOME)
-  const [campaignContext, setCampaignContext] = useState({})
+  const [campaignContext, setCampaignContext] = useState(CampaignContext)
+  const [campaignGenerated, setCampaignGenerated] = useState(false)
   const messagesEndRef = useRef(null)
 
   const scrollToBottom = () => {
@@ -199,22 +146,76 @@ const ChatView = () => {
     // Add user message
     setMessages(prev => [...prev, { text: userMessage, isUser: true, time: 'Just now' }])
     
-    // Show typing indicator
+    // Show typing
     setIsTyping(true)
     
-    // Use local responses (MCP connection coming soon)
+    // Simulate Mike working
     setTimeout(() => {
-      const response = getResponse(conversationState, userMessage, campaignContext)
       setIsTyping(false)
-      setConversationState(response.nextState)
-      if (response.context) setCampaignContext(prev => ({ ...prev, ...response.context }))
       
-      setMessages(prev => [...prev, { 
-        text: response.text, 
-        isUser: false, 
-        time: 'Just now' 
-      }])
-    }, 1200)
+      const lower = userMessage.toLowerCase()
+      let response = ''
+      
+      // User wants to build something
+      if (lower.includes('build') || lower.includes('create') || lower.includes('campaign') || lower.includes('ad') || lower.includes('content')) {
+        // Extract info from message
+        if (lower.includes('meta') || lower.includes('facebook') || lower.includes('instagram')) {
+          setCampaignContext(prev => ({ ...prev, platform: 'Meta' }))
+        } else if (lower.includes('linkedin')) {
+          setCampaignContext(prev => ({ ...prev, platform: 'LinkedIn' }))
+        } else if (lower.includes('google')) {
+          setCampaignContext(prev => ({ ...prev, platform: 'Google' }))
+        }
+        
+        if (lower.includes('brand')) {
+          setCampaignContext(prev => ({ ...prev, goal: 'Brand Awareness' }))
+        } else if (lower.includes('lead')) {
+          setCampaignContext(prev => ({ ...prev, goal: 'Lead Generation' }))
+        } else if (lower.includes('sale')) {
+          setCampaignContext(prev => ({ ...prev, goal: 'Sales' }))
+        }
+        
+        // Extract audience
+        if (lower.includes('hotel')) {
+          setCampaignContext(prev => ({ ...prev, audience: 'Hotels & Resorts' }))
+        } else if (lower.includes('school')) {
+          setCampaignContext(prev => ({ ...prev, audience: 'Schools & Universities' }))
+        } else if (lower.includes('hotel') && lower.includes('school')) {
+          setCampaignContext(prev => ({ ...prev, audience: 'Hotels, Schools & Corporate' }))
+        }
+        
+        response = `Perfect. Let me build that for you.\n\nI'm creating your campaign now - ads, copy, targeting, the works. You'll see everything ready to review.\n\nHold tight...`
+        
+        // Generate campaign after a delay
+        setTimeout(() => {
+          const campaign = generateCampaign(campaignContext)
+          setMessages(prev => [...prev, { text: campaign, isUser: false, time: 'Just now' }])
+          setCampaignGenerated(true)
+        }, 2000)
+        
+      } else if (campaignGenerated && (lower.includes('launch') || lower.includes('go') || lower.includes('post') || lower.includes('publish'))) {
+        response = `🚀 Launching your campaign!\n\nScheduled to start posting tomorrow at 9 AM. I'll monitor performance and send you daily reports.\n\nAnything else you need?`
+        setCampaignGenerated(false)
+        setCampaignContext(CampaignContext)
+        
+      } else if (campaignGenerated && (lower.includes('edit') || lower.includes('change') || lower.includes('update'))) {
+        response = `What would you like to change?\n\n• Platform\n• Goal\n• Audience\n• Budget\n• Ad copy\n\nJust tell me what to update.`
+        
+      } else if (campaignGenerated) {
+        response = `Your campaign is ready for review! Check the **Content** page to see all generated ads.\n\nSay **"launch it"** when you're happy, or **"edit"** to make changes.`
+        
+      } else if (lower.includes('help')) {
+        response = `I'm your AI Marketing Director. Here's how I work:\n\n1. **You tell me what to build** - "Create a Meta campaign for my hotel"\n2. **I build it** - Campaign structure, ads, targeting, copy\n3. **You review** - See everything in the Content page\n4. **You approve** - Say "launch" and I start posting\n\nWhat would you like to create?`
+        
+      } else {
+        response = `Got it. Just tell me what you want to build - campaigns, ads, emails, content - and I'll get to work.\n\nStart with something like:\n• "Create a campaign for my business"\n• "Build Meta ads for my product"\n• "Generate email sequences"`
+      }
+      
+      if (response) {
+        setMessages(prev => [...prev, { text: response, isUser: false, time: 'Just now' }])
+      }
+      
+    }, 1500)
   }
 
   return (
@@ -240,7 +241,7 @@ const ChatView = () => {
           <HeyMikeIcon name="heymikeLogo" size={26} />
         </div>
         <div>
-          <div style={{ fontWeight: '600', fontSize: '16px', color: '#111827' }}>HeyMike</div>
+          <div style={{ fontWeight: '600', fontSize: '16px', color: '#111827' }}>Mike Ops</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E', display: 'inline-block' }} />
             <span style={{ fontSize: '13px', color: '#6B7280' }}>Online</span>
@@ -325,7 +326,7 @@ const ChatView = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Message HeyMike..."
+            placeholder="Tell Mike what to build..."
             style={{
               flex: '1',
               padding: '14px 18px',

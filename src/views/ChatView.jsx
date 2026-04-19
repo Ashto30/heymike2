@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { supabase } from '../lib/supabase'
 import HeyMikeIcon from '../components/HeyMikeIcon'
 
 // Message bubble component
@@ -65,12 +66,32 @@ const MessageBubble = ({ text, isUser, time }) => (
   </div>
 )
 
+// Simulated AI responses for demo
+const getAIResponse = (userMessage) => {
+  const lower = userMessage.toLowerCase()
+  
+  if (lower.includes('campaign') || lower.includes('create')) {
+    return "I'd be happy to help create a campaign! Let me gather some details:\n\n1. What platform? (Meta, LinkedIn, Google)\n2. What's the campaign goal? (Brand awareness, leads, sales)\n3. What's your target audience?\n\nOnce you answer these, I'll start building out the campaign structure."
+  }
+  
+  if (lower.includes('content') || lower.includes('ad')) {
+    return "I can generate various ad content for you:\n\n• Social media posts (Instagram, LinkedIn, Facebook)\n• Google display ads\n• Email marketing sequences\n• Video scripts\n\nWhich would you like to focus on first?"
+  }
+  
+  if (lower.includes('help')) {
+    return "Here's what I can do as your AI Marketing Director:\n\n📊 Create campaigns - Just describe your goal and I'll build it\n🎨 Generate creatives - Images and videos for your ads\n📝 Write copy - Ads, emails, social posts\n🔍 Research - Competitor analysis, market insights\n📅 Plan content - Calendar and scheduling\n\nWhat would you like to work on?"
+  }
+  
+  return "I'm here to help with your marketing. You can ask me to:\n\n• 'Create a B2B campaign for my product'\n• 'Generate social media content'\n• 'Analyze my competitors'\n• 'Write an email sequence'\n\nWhat would you like to do?"
+}
+
 // Chat View
 const ChatView = () => {
   const [messages, setMessages] = useState([
     { text: "Hey, I'm HeyMike. I'm your AI Marketing Director. What would you like to work on today?", isUser: false, time: 'Just now' },
   ])
   const [input, setInput] = useState('')
+  const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef(null)
 
   const scrollToBottom = () => {
@@ -81,17 +102,34 @@ const ChatView = () => {
     scrollToBottom()
   }, [messages])
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return
-    setMessages([...messages, { text: input, isUser: true, time: 'Just now' }])
+    
+    const userMessage = input
     setInput('')
-    setTimeout(() => {
-      setMessages(prev => [...prev, {
-        text: "Got it. I'll get started on that. Check the Content page for new items to review shortly.",
-        isUser: false,
-        time: 'Just now'
+    
+    // Add user message
+    setMessages(prev => [...prev, { text: userMessage, isUser: true, time: 'Just now' }])
+    
+    // Show typing indicator
+    setIsTyping(true)
+    
+    // Simulate AI thinking
+    setTimeout(async () => {
+      setIsTyping(false)
+      
+      // Get AI response
+      const aiResponse = getAIResponse(userMessage)
+      
+      setMessages(prev => [...prev, { 
+        text: aiResponse, 
+        isUser: false, 
+        time: 'Just now' 
       }])
-    }, 1000)
+      
+      // Try to save to Supabase (if user is logged in)
+      // For demo purposes, we skip auth and just show the chat
+    }, 1500)
   }
 
   return (
@@ -135,6 +173,53 @@ const ChatView = () => {
         {messages.map((msg, i) => (
           <MessageBubble key={i} text={msg.text} isUser={msg.isUser} time={msg.time} />
         ))}
+        
+        {/* Typing indicator */}
+        {isTyping && (
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: '#2563EB',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+              <HeyMikeIcon name="heymikeLogo" size={20} />
+            </div>
+            <div style={{
+              padding: '14px 18px',
+              borderRadius: '18px 18px 18px 6px',
+              background: 'white',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+            }}>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <div style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#9CA3AF',
+                  animation: 'bounce 1.4s infinite ease-in-out both'
+                }} />
+                <div style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#9CA3AF',
+                  animation: 'bounce 1.4s infinite ease-in-out 0.16s both'
+                }} />
+                <div style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: '#9CA3AF',
+                  animation: 'bounce 1.4s infinite ease-in-out 0.32s both'
+                }} />
+              </div>
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
@@ -185,6 +270,14 @@ const ChatView = () => {
           </button>
         </div>
       </div>
+
+      {/* Animation styles */}
+      <style>{`
+        @keyframes bounce {
+          0%, 80%, 100% { transform: scale(0); }
+          40% { transform: scale(1); }
+        }
+      `}</style>
     </div>
   )
 }

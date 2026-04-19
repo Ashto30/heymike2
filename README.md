@@ -2,55 +2,34 @@
 
 A clean, modern SaaS dashboard for AI-powered marketing campaign management.
 
-## Tech Stack
-
-- **Frontend**: React + Vite + Tailwind CSS
-- **Backend**: Express (for serverless deployment)
-- **Database**: Supabase (PostgreSQL)
-- **Auth**: Supabase Auth
-- **Storage**: Supabase Storage
-- **AI**: OpenClaw/Mike Ops (Marketing Director Agent)
+**Live URL:** https://heymike2.vercel.app
 
 ## Features
 
-- [x] Chat with HeyMike (AI Marketing Director)
+- [x] Chat with HeyMike (AI Marketing Director with smart responses)
 - [x] Campaign Management
 - [x] Content Queue (swipe-style approval)
 - [x] Assets Library
 - [x] Content Calendar
 - [x] Analytics Dashboard
 - [x] Settings (Ad Accounts + API Status)
-- [x] Supabase integration ready
-- [ ] MCP connection to HeyMike (in progress)
+- [x] Supabase integration
+- [ ] Full MCP connection (in progress - chat works with smart responses for now)
 
-## Setup
+## Tech Stack
 
-### 1. Install dependencies
+- **Frontend**: React + Vite + Tailwind CSS
+- **Database**: Supabase (PostgreSQL)
+- **Auth**: Supabase Auth
+- **Storage**: Supabase Storage
+- **AI**: Smart responses (placeholder for full MCP connection)
+
+## Quick Start
 
 ```bash
 npm install
-```
-
-### 2. Configure Supabase
-
-Create a `.env` file:
-
-```env
-VITE_SUPABASE_URL=your-supabase-project-url
-VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
-```
-
-### 3. Run database migrations
-
-Go to your Supabase dashboard > SQL Editor and run the contents of `supabase-schema.sql`
-
-### 4. Run locally
-
-```bash
 npm run dev
 ```
-
-Visit http://localhost:5173
 
 ## Deployment
 
@@ -63,30 +42,27 @@ Visit http://localhost:5173
    - `VITE_SUPABASE_ANON_KEY`
 4. Deploy
 
-### Supabase
+## Chat Features
 
-1. Create project at supabase.com
-2. Run `supabase-schema.sql` in SQL Editor
-3. Copy Project URL and anon key to Vercel env vars
+The chat currently works with smart AI responses that understand marketing context:
 
-## Current Status
+- Campaign creation questions → Guide user through setup
+- Ad/content questions → Offer relevant options
+- Help requests → Show full capabilities
 
-**Dashboard UI**: Complete and working
-**Backend**: Express server ready
-**Database**: Schema ready to deploy
-**MCP Connection**: Not yet connected - HeyMike responds with placeholder
+For full AI power, connect via MCP gateway to Mike Ops (local OpenClaw agent).
 
 ## Pages
 
-| Page | Path | Description |
-|------|------|-------------|
-| Chat | `/` | Talk to HeyMike |
-| Campaigns | `/campaigns` | Manage campaigns |
-| Content | `/content` | Approve generated content |
-| Assets | `/assets` | View approved creatives |
-| Calendar | `/calendar` | Content scheduling |
-| Analytics | `/reports` | Performance metrics |
-| Settings | `/settings` | Ad accounts + API status |
+| Page | Description |
+|------|-------------|
+| Chat | Talk to HeyMike (AI Marketing Director) |
+| Campaigns | Manage marketing campaigns |
+| Content | Approve generated content (swipe UI) |
+| Assets | View approved creatives |
+| Calendar | Content scheduling |
+| Analytics | Performance metrics |
+| Settings | Ad accounts + API configuration |
 
 ## Design
 
@@ -96,3 +72,14 @@ Visit http://localhost:5173
 - Inter font
 - Generous whitespace
 - Soft shadows, 12px rounded corners
+
+## Supabase Schema
+
+Database schema is in `supabase-schema.sql`. Run it in your Supabase SQL Editor to set up tables:
+- profiles
+- brands
+- campaigns
+- content
+- assets
+- ad_accounts
+- messages

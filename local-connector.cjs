@@ -1,4 +1,4 @@
-// HeyMike Local Connector v4
+// HeyMike Local Connector v5
 // Uses direct CLI to send messages to Mike Ops
 //
 // Keep this running while you use HeyMike dashboard
@@ -10,14 +10,15 @@ const { spawn } = require('child_process');
 const SUPABASE_URL = 'https://uyaepyidfwkypjvsxzae.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5YWVweWlkZndreXBqdnN4emFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MDYxODYsImV4cCI6MjA5MjE4MjE4Nn0.i1qnxJeYDB9ON_7cGT7NDm2dOAysCDQL0bM1r__EPKA';
 const SESSION_ID = 'heymike-demo-session';
+const MIKE_CONFIG = '/Users/ash/.openclaw/openclaw-mike.json';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let isProcessing = false;
 
 console.log('╔══════════════════════════════════════════╗');
-console.log('║  HeyMike Local Connector v4            ║');
-console.log('║  Using direct CLI to Mike Ops        ║');
+console.log('║  HeyMike Local Connector v5            ║');
+console.log('║  Mike Ops - Workspace-mike            ║');
 console.log('╚══════════════════════════════════════════╝\n');
 
 // Send to Mike Ops via CLI
@@ -30,7 +31,7 @@ function sendToMikeOps(message) {
       '--agent', 'main',
       '--message', message
     ], {
-      env: { ...process.env, OPENCLAW_CONFIG_PATH: '/Users/ash/.openclaw/openclaw-mike.json' },
+      env: { ...process.env, OPENCLAW_CONFIG_PATH: MIKE_CONFIG },
       timeout: 30000
     });
 
@@ -100,7 +101,7 @@ async function pollMessages() {
         console.log('✅ Response received');
         console.log(`   "${response.substring(0, 80)}${response.length > 80 ? '...' : ''}"`);
         
-        // Save response to Supabase (processed: false so poll can find it)
+        // Save response to Supabase
         await supabase.from('demo_messages').insert({
           session_id: SESSION_ID,
           sender: 'assistant',
@@ -117,7 +118,7 @@ async function pollMessages() {
           session_id: SESSION_ID,
           sender: 'assistant',
           content: `Error: ${err.message}. Is Mike Ops running?`,
-          processed: true
+          processed: false
         });
       }
       

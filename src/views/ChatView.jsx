@@ -1,133 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
 import HeyMikeIcon from '../components/HeyMikeIcon'
 
-// Campaign context stored during conversation
-const CampaignContext = {
-  platform: '',
-  goal: '',
-  audience: '',
-  brand: '',
-  budget: ''
-}
-
-// Simulated campaign generation (replaces MCP for now)
-const generateCampaign = (context) => {
-  const { platform, goal, audience, brand } = context
-  
-  return `
-🎯 **Campaign Generated**
-
-**Platform:** ${platform || 'Meta'}
-**Goal:** ${goal || 'Brand Awareness + Lead Gen'}
-**Audience:** ${audience || 'Hotels, Schools, Corporate offices'}
-
----
-
-**📅 Campaign Structure (14 Days)**
-
-**Week 1 - Awareness**
-• Day 1-2: Video ad - Brand story
-• Day 3-4: Carousel - Services showcase  
-• Day 5-7: Lead gen form ad
-
-**Week 2 - Nurture**
-• Day 8-10: Retargeting video
-• Day 11-12: Testimonial carousel
-• Day 13-14: Final conversion push
-
----
-
-**📝 Ad Copy Ready:**
-
-**Ad 1 - Video Hook:**
-"Play areas that transform spaces. Hotels, schools, communities - we design adventure."
-
-**Ad 2 - Lead Gen:**
-"Get a free site survey for your play area. No obligation, just ideas."
-
-**Ad 3 - Carousel:**
-3-image carousel showing before/after transformations
-
----
-
-All content ready for your review. Say **"launch it"** to start posting, or **"edit"** to make changes.`
-}
-
-// Message bubble component
-const MessageBubble = ({ text, isUser, time }) => (
-  <div style={{
-    display: 'flex',
-    justifyContent: isUser ? 'flex-end' : 'flex-start',
-    gap: '12px',
-    marginBottom: '20px',
-  }}>
-    {!isUser && (
-      <div style={{
-        width: '36px',
-        height: '36px',
-        borderRadius: '10px',
-        background: '#2563EB',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-      }}>
-        <HeyMikeIcon name="heymikeLogo" size={20} />
-      </div>
-    )}
-    <div style={{ maxWidth: '72%' }}>
-      <div style={{
-        padding: '14px 18px',
-        borderRadius: isUser ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
-        background: isUser ? '#2563EB' : 'white',
-        color: isUser ? 'white' : '#111827',
-        fontSize: '14px',
-        lineHeight: '1.6',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-        whiteSpace: 'pre-wrap',
-      }}>
-        {text}
-      </div>
-      <span style={{
-        fontSize: '11px',
-        color: '#9CA3AF',
-        marginTop: '6px',
-        display: 'block',
-        paddingLeft: isUser ? '0' : '4px',
-      }}>
-        {time}
-      </span>
-    </div>
-    {isUser && (
-      <div style={{
-        width: '36px',
-        height: '36px',
-        borderRadius: '10px',
-        background: '#F3F4F6',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-        fontSize: '13px',
-        fontWeight: '600',
-        color: '#374151',
-      }}>
-        A
-      </div>
-    )}
-  </div>
-)
-
-// Chat View
+// Chat View - connects to Mike Ops via MCP
 const ChatView = () => {
   const [messages, setMessages] = useState([
     { text: "Hey! I'm Mike Ops, your AI Marketing Director.\n\nJust tell me what you want to build - campaigns, ads, content - and I'll handle the rest. You approve, I create.\n\nWhat are we building today?", isUser: false, time: 'Just now' },
   ])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
-  const [campaignContext, setCampaignContext] = useState(CampaignContext)
-  const [campaignGenerated, setCampaignGenerated] = useState(false)
+  const [isMikeTyping, setIsMikeTyping] = useState(false)
   const messagesEndRef = useRef(null)
+  const pollIntervalRef = useRef(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -135,7 +18,34 @@ const ChatView = () => {
 
   useEffect(() => {
     scrollToBottom()
+    return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
+    }
   }, [messages])
+
+  // Poll for Mike's response
+  const startPolling = () => {
+    setIsMikeTyping(true)
+    
+    pollIntervalRef.current = setInterval(async () => {
+      try {
+        const response = await fetch('/api/poll')
+        const data = await response.json()
+        
+        if (data.hasResponse) {
+          clearInterval(pollIntervalRef.current)
+          setIsMikeTyping(false)
+          setMessages(prev => [...prev, { 
+            text: data.response, 
+            isUser: false, 
+            time: 'Just now' 
+          }])
+        }
+      } catch (e) {
+        console.error('Poll error:', e)
+      }
+    }, 1000) // Poll every second
+  }
 
   const handleSend = async () => {
     if (!input.trim()) return
@@ -146,76 +56,29 @@ const ChatView = () => {
     // Add user message
     setMessages(prev => [...prev, { text: userMessage, isUser: true, time: 'Just now' }])
     
-    // Show typing
     setIsTyping(true)
     
-    // Simulate Mike working
-    setTimeout(() => {
+    try {
+      // Send to MCP via Supabase
+      await fetch('/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage })
+      })
+      
       setIsTyping(false)
       
-      const lower = userMessage.toLowerCase()
-      let response = ''
+      // Start polling for Mike's response
+      startPolling()
       
-      // User wants to build something
-      if (lower.includes('build') || lower.includes('create') || lower.includes('campaign') || lower.includes('ad') || lower.includes('content')) {
-        // Extract info from message
-        if (lower.includes('meta') || lower.includes('facebook') || lower.includes('instagram')) {
-          setCampaignContext(prev => ({ ...prev, platform: 'Meta' }))
-        } else if (lower.includes('linkedin')) {
-          setCampaignContext(prev => ({ ...prev, platform: 'LinkedIn' }))
-        } else if (lower.includes('google')) {
-          setCampaignContext(prev => ({ ...prev, platform: 'Google' }))
-        }
-        
-        if (lower.includes('brand')) {
-          setCampaignContext(prev => ({ ...prev, goal: 'Brand Awareness' }))
-        } else if (lower.includes('lead')) {
-          setCampaignContext(prev => ({ ...prev, goal: 'Lead Generation' }))
-        } else if (lower.includes('sale')) {
-          setCampaignContext(prev => ({ ...prev, goal: 'Sales' }))
-        }
-        
-        // Extract audience
-        if (lower.includes('hotel')) {
-          setCampaignContext(prev => ({ ...prev, audience: 'Hotels & Resorts' }))
-        } else if (lower.includes('school')) {
-          setCampaignContext(prev => ({ ...prev, audience: 'Schools & Universities' }))
-        } else if (lower.includes('hotel') && lower.includes('school')) {
-          setCampaignContext(prev => ({ ...prev, audience: 'Hotels, Schools & Corporate' }))
-        }
-        
-        response = `Perfect. Let me build that for you.\n\nI'm creating your campaign now - ads, copy, targeting, the works. You'll see everything ready to review.\n\nHold tight...`
-        
-        // Generate campaign after a delay
-        setTimeout(() => {
-          const campaign = generateCampaign(campaignContext)
-          setMessages(prev => [...prev, { text: campaign, isUser: false, time: 'Just now' }])
-          setCampaignGenerated(true)
-        }, 2000)
-        
-      } else if (campaignGenerated && (lower.includes('launch') || lower.includes('go') || lower.includes('post') || lower.includes('publish'))) {
-        response = `🚀 Launching your campaign!\n\nScheduled to start posting tomorrow at 9 AM. I'll monitor performance and send you daily reports.\n\nAnything else you need?`
-        setCampaignGenerated(false)
-        setCampaignContext(CampaignContext)
-        
-      } else if (campaignGenerated && (lower.includes('edit') || lower.includes('change') || lower.includes('update'))) {
-        response = `What would you like to change?\n\n• Platform\n• Goal\n• Audience\n• Budget\n• Ad copy\n\nJust tell me what to update.`
-        
-      } else if (campaignGenerated) {
-        response = `Your campaign is ready for review! Check the **Content** page to see all generated ads.\n\nSay **"launch it"** when you're happy, or **"edit"** to make changes.`
-        
-      } else if (lower.includes('help')) {
-        response = `I'm your AI Marketing Director. Here's how I work:\n\n1. **You tell me what to build** - "Create a Meta campaign for my hotel"\n2. **I build it** - Campaign structure, ads, targeting, copy\n3. **You review** - See everything in the Content page\n4. **You approve** - Say "launch" and I start posting\n\nWhat would you like to create?`
-        
-      } else {
-        response = `Got it. Just tell me what you want to build - campaigns, ads, emails, content - and I'll get to work.\n\nStart with something like:\n• "Create a campaign for my business"\n• "Build Meta ads for my product"\n• "Generate email sequences"`
-      }
-      
-      if (response) {
-        setMessages(prev => [...prev, { text: response, isUser: false, time: 'Just now' }])
-      }
-      
-    }, 1500)
+    } catch (error) {
+      setIsTyping(false)
+      setMessages(prev => [...prev, { 
+        text: "Couldn't reach Mike. Make sure the local connector is running.", 
+        isUser: false, 
+        time: 'Just now' 
+      }])
+    }
   }
 
   return (
@@ -257,11 +120,98 @@ const ChatView = () => {
         background: '#FAFAFA',
       }}>
         {messages.map((msg, i) => (
-          <MessageBubble key={i} text={msg.text} isUser={msg.isUser} time={msg.time} />
+          <div key={i} style={{
+            display: 'flex',
+            justifyContent: msg.isUser ? 'flex-end' : 'flex-start',
+            gap: '12px',
+            marginBottom: '20px',
+          }}>
+            {!msg.isUser && (
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                background: '#2563EB',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <HeyMikeIcon name="heymikeLogo" size={20} />
+              </div>
+            )}
+            <div style={{ maxWidth: '72%' }}>
+              <div style={{
+                padding: '14px 18px',
+                borderRadius: msg.isUser ? '18px 18px 6px 18px' : '18px 18px 18px 6px',
+                background: msg.isUser ? '#2563EB' : 'white',
+                color: msg.isUser ? 'white' : '#111827',
+                fontSize: '14px',
+                lineHeight: '1.6',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                whiteSpace: 'pre-wrap',
+              }}>
+                {msg.text}
+              </div>
+              <span style={{
+                fontSize: '11px',
+                color: '#9CA3AF',
+                marginTop: '6px',
+                display: 'block',
+                paddingLeft: msg.isUser ? '0' : '4px',
+              }}>
+                {msg.time}
+              </span>
+            </div>
+            {msg.isUser && (
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '10px',
+                background: '#F3F4F6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                fontSize: '13px',
+                fontWeight: '600',
+                color: '#374151',
+              }}>
+                A
+              </div>
+            )}
+          </div>
         ))}
         
-        {/* Typing indicator */}
+        {/* User typing indicator */}
         {isTyping && (
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+            <div style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '10px',
+              background: '#F3F4F6',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '13px',
+              fontWeight: '600',
+              color: '#374151',
+            }}>
+              A
+            </div>
+            <div style={{
+              padding: '14px 18px',
+              borderRadius: '18px 18px 18px 6px',
+              background: '#F3F4F6',
+            }}>
+              <span style={{ color: '#9CA3AF', fontSize: '14px' }}>Typing...</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Mike typing indicator */}
+        {isMikeTyping && (
           <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
             <div style={{
               width: '36px',

@@ -12,8 +12,8 @@ const STATES = {
   READY: 'ready'
 }
 
-// Generate smart response based on state and message
-const getResponse = (state, userMessage) => {
+// Generate smart response based on state and message and context
+const getResponse = (state, userMessage, context = {}) => {
   const lower = userMessage.toLowerCase()
   
   // Handle welcome state
@@ -49,15 +49,15 @@ const getResponse = (state, userMessage) => {
   
   // Handle goal selection
   if (state === STATES.AWAITING_GOAL) {
-    const context = { platform: 'Meta' } // Would be stored from previous step
+    const platform = context.platform || 'Meta'
     if (lower.includes('brand') || lower.includes('awareness')) {
-      return { text: "**Brand Awareness** - Perfect for B2B!\n\n**Who's your target audience?**\n• Hotels & Resorts\n• Schools & Universities\n• Hospitals\n• Corporate offices\n• Or describe your own...", nextState: STATES.AWAITING_AUDIENCE, context: { platform: 'Meta', goal: 'Brand Awareness' } }
+      return { text: `**Brand Awareness** - Perfect for B2B!\n\n**Who's your target audience?**\n• Hotels & Resorts\n• Schools & Universities\n• Hospitals\n• Corporate offices\n• Or describe your own...`, nextState: STATES.AWAITING_AUDIENCE, context: { platform, goal: 'Brand Awareness' } }
     }
     if (lower.includes('lead') || lower.includes('generation')) {
-      return { text: "**Lead Generation** - Great choice!\n\n**Who's your target audience?**\n• Hotels & Resorts\n• Schools & Universities\n• Hospitals\n• Corporate offices\n• Or describe your own...", nextState: STATES.AWAITING_AUDIENCE, context: { platform: 'Meta', goal: 'Lead Generation' } }
+      return { text: `**Lead Generation** - Great choice!\n\n**Who's your target audience?**\n• Hotels & Resorts\n• Schools & Universities\n• Hospitals\n• Corporate offices\n• Or describe your own...`, nextState: STATES.AWAITING_AUDIENCE, context: { platform, goal: 'Lead Generation' } }
     }
     if (lower.includes('sales') || lower.includes('conversion')) {
-      return { text: "**Sales** - Let's drive revenue!\n\n**Who's your target audience?**\n• Hotels & Resorts\n• Schools & Universities\n• Hospitals\n• Corporate offices\n• Or describe your own...", nextState: STATES.AWAITING_AUDIENCE, context: { platform: 'Meta', goal: 'Sales' } }
+      return { text: `**Sales** - Let's drive revenue!\n\n**Who's your target audience?**\n• Hotels & Resorts\n• Schools & Universities\n• Hospitals\n• Corporate offices\n• Or describe your own...`, nextState: STATES.AWAITING_AUDIENCE, context: { platform, goal: 'Sales' } }
     }
     return { text: "What's the goal? (Brand Awareness, Lead Generation, Sales, or Website Traffic)", nextState: STATES.AWAITING_GOAL }
   }
@@ -172,6 +172,7 @@ const ChatView = () => {
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [conversationState, setConversationState] = useState(STATES.WELCOME)
+  const [campaignContext, setCampaignContext] = useState({})
   const messagesEndRef = useRef(null)
 
   const scrollToBottom = () => {
@@ -196,9 +197,10 @@ const ChatView = () => {
     
     // Get response based on state
     setTimeout(() => {
-      const response = getResponse(conversationState, userMessage)
+      const response = getResponse(conversationState, userMessage, campaignContext)
       setIsTyping(false)
       setConversationState(response.nextState)
+      if (response.context) setCampaignContext(prev => ({ ...prev, ...response.context }))
       
       setMessages(prev => [...prev, { 
         text: response.text, 

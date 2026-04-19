@@ -202,19 +202,39 @@ const ChatView = () => {
     // Show typing indicator
     setIsTyping(true)
     
-    // Get response based on state
-    setTimeout(() => {
-      const response = getResponse(conversationState, userMessage, campaignContext)
-      setIsTyping(false)
-      setConversationState(response.nextState)
-      if (response.context) setCampaignContext(prev => ({ ...prev, ...response.context }))
+    // Call MCP API (when connected) or use local responses
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: userMessage,
+          userId: 'demo-user'
+        })
+      })
       
+      const data = await response.json()
+      setIsTyping(false)
       setMessages(prev => [...prev, { 
-        text: response.text, 
+        text: data.response || 'Processed', 
         isUser: false, 
         time: 'Just now' 
       }])
-    }, 1200)
+    } catch (error) {
+      // Fallback to local responses
+      setTimeout(() => {
+        const response = getResponse(conversationState, userMessage, campaignContext)
+        setIsTyping(false)
+        setConversationState(response.nextState)
+        if (response.context) setCampaignContext(prev => ({ ...prev, ...response.context }))
+        
+        setMessages(prev => [...prev, { 
+          text: response.text, 
+          isUser: false, 
+          time: 'Just now' 
+        }])
+      }, 1200)
+    }
   }
 
   return (

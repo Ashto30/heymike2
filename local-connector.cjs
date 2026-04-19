@@ -99,12 +99,12 @@ async function pollMessages() {
         console.log('✅ Response received');
         console.log(`   "${response.substring(0, 80)}${response.length > 80 ? '...' : ''}"`);
         
-        // Save response to Supabase
+        // Save response to Supabase (processed: false so poll can find it)
         await supabase.from('demo_messages').insert({
           session_id: SESSION_ID,
           sender: 'assistant',
           content: response,
-          processed: true
+          processed: false
         });
         
         console.log('💾 Response saved to Supabase');

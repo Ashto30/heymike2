@@ -30,6 +30,7 @@ function sendToMikeOps(message) {
       '--agent', 'main',
       '--message', message
     ], {
+      env: { ...process.env, OPENCLAW_CONFIG_PATH: '/Users/ash/.openclaw/openclaw-mike.json' },
       timeout: 30000
     });
 

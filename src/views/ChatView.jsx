@@ -18,7 +18,7 @@ const getResponse = (state, userMessage, context = {}) => {
   
   // Handle welcome state
   if (state === STATES.WELCOME) {
-    if (lower.includes('campaign') && (lower.includes('create') || lower.includes('start') || lower.includes('new'))) {
+    if (lower.includes('campaign')) {
       return { text: "Let's create a campaign! First question:\n\n**What platform?** (Meta, LinkedIn, Google, or All)", nextState: STATES.AWAITING_PLATFORM }
     }
     if (lower.includes('content') || lower.includes('ad') || lower.includes('creative')) {
@@ -88,7 +88,14 @@ const getResponse = (state, userMessage, context = {}) => {
     }
   }
   
-  // Ready state - general help
+  // Ready state - but check for key intents first
+  if (lower.includes('campaign') && (lower.includes('create') || lower.includes('start') || lower.includes('new'))) {
+    return { text: "Let's create a campaign! First question:\n\n**What platform?** (Meta, LinkedIn, Google, or All)", nextState: STATES.AWAITING_PLATFORM }
+  }
+  if (lower.includes('content') || lower.includes('ad') || lower.includes('creative')) {
+    return { text: "What type of content?\n\n• Social media posts\n• Google display ads\n• Email sequences\n• Video scripts\n\nJust say the type and I'll get to work!", nextState: STATES.CREATING_CONTENT }
+  }
+  
   return { 
     text: "I'm ready! Here's what I can do:\n\n**Campaigns** - Say 'create campaign' to start fresh\n**Content** - Say 'generate ads' or 'write emails'\n**Research** - Ask about competitors\n**Calendar** - Plan your schedule\n\nJust tell me what you need!", 
     nextState: STATES.READY 

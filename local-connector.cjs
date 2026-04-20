@@ -68,20 +68,23 @@ async function pollMessages() {
   if (isProcessing) return;
   
   try {
-    const { data: messages, error } = await supabase
+    // First, mark ALL pending user messages as processed to prevent duplicates
+    const { data: pending } = await supabase
       .from('demo_messages')
-      .select('*')
+      .select('id')
       .eq('session_id', SESSION_ID)
       .eq('sender', 'user')
-      .not('processed', 'eq', true)
-      .order('created_at', { ascending: true })
-      .limit(1);
-
-    if (error) throw error;
-
-    if (messages && messages.length > 0) {
-      isProcessing = true;
-      const msg = messages[0];
+      .eq('processed', false)
+      .order('created_at', { ascending: true });
+    
+    if (!pending || pending.length === 0) return;
+    
+    // Take only the first message and mark it immediately
+    const msg = pending[0];
+    isProcessing = true;
+      
+      // Mark original as processed immediately when we start
+      await supabase.from('demo_messages').update({ processed: true }).eq('id', msg.id);
       
       console.log('\n📨 Message from dashboard:');
       console.log(`   "${msg.content.substring(0, 80)}${msg.content.length > 80 ? '...' : ''}"`);
@@ -112,9 +115,6 @@ async function pollMessages() {
           processed: false
         });
       }
-      
-      // Mark original as processed
-      await supabase.from('demo_messages').update({ processed: true }).eq('id', msg.id);
       
       isProcessing = false;
     }

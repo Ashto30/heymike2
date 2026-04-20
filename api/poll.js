@@ -1,4 +1,5 @@
 // Poll for assistant response from local connector
+// Uses a tracking table to avoid duplicates
 import { createClient } from '@supabase/supabase-js'
 
 const SUPABASE_URL = 'https://uyaepyidfwkypjvsxzae.supabase.co'
@@ -13,22 +14,23 @@ export default async function handler(req, res) {
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
   try {
-    // Get latest assistant response
+    // Get ONE latest unpolled assistant response
     const { data, error } = await supabase
       .from('demo_messages')
       .select('*')
       .eq('session_id', SESSION_ID)
       .eq('sender', 'assistant')
+      .eq('polled', false)
       .order('created_at', { ascending: false })
       .limit(1)
 
     if (error) throw error
 
     if (data && data.length > 0) {
-      // Delete the response after sending
+      // Mark as polled IMMEDIATELY so no other poll can get this
       await supabase
         .from('demo_messages')
-        .delete()
+        .update({ polled: true })
         .eq('id', data[0].id)
 
       return res.status(200).json({

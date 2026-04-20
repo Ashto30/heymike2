@@ -1,5 +1,5 @@
-// HeyMike Local Connector v7b
-// Uses synchronous spawn to send messages to Mike Ops
+// HeyMike Local Connector v8
+// Uses polled flag to prevent duplicate responses
 //
 // Keep this running while you use HeyMike dashboard
 
@@ -19,8 +19,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let isProcessing = false;
 
 console.log('╔══════════════════════════════════════════╗');
-console.log('║  HeyMike Local Connector v7b            ║');
-console.log('║  Mike Ops - synchronous              ║');
+console.log('║  HeyMike Local Connector v8            ║');
+console.log('║  Mike Ops - polled flag              ║');
 console.log('╚══════════════════════════════════════════╝\n');
 
 // Send to Mike Ops via CLI (synchronous)
@@ -68,22 +68,22 @@ async function pollMessages() {
   if (isProcessing) return;
   
   try {
-    // First, mark ALL pending user messages as processed to prevent duplicates
-    const { data: pending } = await supabase
+    // Get unprocessed user messages
+    const { data: messages } = await supabase
       .from('demo_messages')
       .select('id, content')
       .eq('session_id', SESSION_ID)
       .eq('sender', 'user')
       .eq('processed', false)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (!messages || messages.length === 0) return;
     
-    if (!pending || pending.length === 0) return;
-    
-    // Take only the first message and mark it immediately
-    const msg = pending[0];
+    const msg = messages[0];
     isProcessing = true;
     
-    // Mark as processed immediately to prevent duplicate processing
+    // Mark as processed immediately
     await supabase.from('demo_messages').update({ processed: true }).eq('id', msg.id);
     
     console.log('\n📨 Message from dashboard:');
@@ -95,12 +95,13 @@ async function pollMessages() {
       console.log('✅ Response received');
       console.log(`   "${response.substring(0, 80)}${response.length > 80 ? '...' : ''}"`);
       
-      // Save response to Supabase
+      // Save response with polled=false so dashboard can get it
       await supabase.from('demo_messages').insert({
         session_id: SESSION_ID,
         sender: 'assistant',
         content: response,
-        processed: false
+        processed: true,
+        polled: false
       });
       
       console.log('💾 Response saved to Supabase');
@@ -112,7 +113,8 @@ async function pollMessages() {
         session_id: SESSION_ID,
         sender: 'assistant',
         content: `Error: ${err.message}. Is Mike Ops running?`,
-        processed: false
+        processed: true,
+        polled: false
       });
     }
     

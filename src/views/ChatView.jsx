@@ -1,14 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
 import HeyMikeIcon from '../components/HeyMikeIcon'
 
+const SUPABASE_URL = 'https://uyaepyidfwkypjvsxzae.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5YWVweWlkZndreXBqdnN4emFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MDYxODYsImV4cCI6MjA5MjE4MjE4Nn0.i1qnxJeYDB9ON_7cGT7NDm2dOAysCDQL0bM1r__EPKA'
+const SESSION_ID = 'heymike-demo-session'
+
 // Chat View - connects to Mike Ops via MCP
 const ChatView = () => {
-  const [messages, setMessages] = useState([
-    { text: "Hey! I'm Mike Ops, your AI Marketing Director.\n\nJust tell me what you want to build - campaigns, ads, content - and I'll handle the rest. You approve, I create.\n\nWhat are we building today?", isUser: false, time: 'Just now' },
-  ])
+  const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [isMikeTyping, setIsMikeTyping] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
   const messagesEndRef = useRef(null)
   const pollIntervalRef = useRef(null)
 
@@ -22,6 +25,52 @@ const ChatView = () => {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current)
     }
   }, [messages])
+
+  // Load message history from Supabase on mount
+  useEffect(() => {
+    if (isLoaded) return
+    
+    const loadHistory = async () => {
+      try {
+        const { createClient } = await import('@supabase/supabase-js')
+        const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+        
+        const { data, error } = await supabase
+          .from('demo_messages')
+          .select('sender, content, created_at')
+          .eq('session_id', SESSION_ID)
+          .order('created_at', { ascending: true })
+        
+        if (error) throw error
+        
+        if (data && data.length > 0) {
+          const loadedMessages = data.map(msg => ({
+            text: msg.content,
+            isUser: msg.sender === 'user',
+            time: 'Earlier'
+          }))
+          setMessages(loadedMessages)
+        } else {
+          // No history - show welcome
+          setMessages([{ 
+            text: "Hey! I'm Mike Ops, your AI Marketing Director.\n\nJust tell me what you want to build - campaigns, ads, content - and I'll handle the rest. You approve, I create.\n\nWhat are we building today?", 
+            isUser: false, 
+            time: 'Just now' 
+          }])
+        }
+      } catch (e) {
+        console.error('Failed to load history:', e)
+        setMessages([{ 
+          text: "Hey! I'm Mike Ops, your AI Marketing Director.\n\nJust tell me what you want to build?", 
+          isUser: false, 
+          time: 'Just now' 
+        }])
+      }
+      setIsLoaded(true)
+    }
+    
+    loadHistory()
+  }, [isLoaded])
 
   // Poll for Mike's response
   const startPolling = () => {
@@ -44,7 +93,7 @@ const ChatView = () => {
       } catch (e) {
         console.error('Poll error:', e)
       }
-    }, 1000) // Poll every second
+    }, 500) // Poll every 500ms for faster response
   }
 
   const handleSend = async () => {
@@ -53,10 +102,10 @@ const ChatView = () => {
     const userMessage = input
     setInput('')
     
-    // Add user message
+    // Add user message immediately
     setMessages(prev => [...prev, { text: userMessage, isUser: true, time: 'Just now' }])
     
-    setIsTyping(true)
+    setIsTyping(false)
     
     try {
       // Send to MCP via Supabase
@@ -66,13 +115,10 @@ const ChatView = () => {
         body: JSON.stringify({ message: userMessage })
       })
       
-      setIsTyping(false)
-      
       // Start polling for Mike's response
       startPolling()
       
     } catch (error) {
-      setIsTyping(false)
       setMessages(prev => [...prev, { 
         text: "Couldn't reach Mike. Make sure the local connector is running.", 
         isUser: false, 
@@ -182,33 +228,6 @@ const ChatView = () => {
             )}
           </div>
         ))}
-        
-        {/* User typing indicator */}
-        {isTyping && (
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
-            <div style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '10px',
-              background: '#F3F4F6',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '13px',
-              fontWeight: '600',
-              color: '#374151',
-            }}>
-              A
-            </div>
-            <div style={{
-              padding: '14px 18px',
-              borderRadius: '18px 18px 18px 6px',
-              background: '#F3F4F6',
-            }}>
-              <span style={{ color: '#9CA3AF', fontSize: '14px' }}>Typing...</span>
-            </div>
-          </div>
-        )}
         
         {/* Mike typing indicator */}
         {isMikeTyping && (

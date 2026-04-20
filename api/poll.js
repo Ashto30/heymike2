@@ -4,6 +4,9 @@ const SUPABASE_URL = 'https://uyaepyidfwkypjvsxzae.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV5YWVweWlkZndreXBqdnN4emFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2MDYxODYsImV4cCI6MjA5MjE4MjE4Nn0.i1qnxJeYDB9ON_7cGT7NDm2dOAysCDQL0bM1r__EPKA'
 const SESSION_ID = 'heymike-demo-session'
 
+// In-memory tracking of last delivered response ID
+let lastDeliveredId = null
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -12,29 +15,28 @@ export default async function handler(req, res) {
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
   try {
-    // Get latest unpolled assistant response
+    // Get all assistant responses ordered by time
     const { data, error } = await supabase
       .from('demo_messages')
       .select('id, content')
       .eq('session_id', SESSION_ID)
       .eq('sender', 'assistant')
-      .or(`polled.is.null,polled.eq.false`)
       .order('created_at', { ascending: false })
-      .limit(1)
+      .limit(10)
 
     if (error) throw error
 
     if (data && data.length > 0) {
-      // Mark as polled immediately
-      await supabase
-        .from('demo_messages')
-        .update({ polled: true })
-        .eq('id', data[0].id)
-
-      return res.status(200).json({
-        hasResponse: true,
-        response: data[0].content
-      })
+      // Find the first one that wasn't last delivered
+      const newResponse = data.find(msg => msg.id !== lastDeliveredId)
+      
+      if (newResponse) {
+        lastDeliveredId = newResponse.id
+        return res.status(200).json({
+          hasResponse: true,
+          response: newResponse.content
+        })
+      }
     }
 
     return res.status(200).json({ hasResponse: false })

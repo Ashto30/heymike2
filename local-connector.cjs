@@ -1,4 +1,4 @@
-// HeyMike Local Connector v7
+// HeyMike Local Connector v7b
 // Uses synchronous spawn to send messages to Mike Ops
 //
 // Keep this running while you use HeyMike dashboard
@@ -19,7 +19,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let isProcessing = false;
 
 console.log('╔══════════════════════════════════════════╗');
-console.log('║  HeyMike Local Connector v7            ║');
+console.log('║  HeyMike Local Connector v7b            ║');
 console.log('║  Mike Ops - synchronous              ║');
 console.log('╚══════════════════════════════════════════╝\n');
 
@@ -71,7 +71,7 @@ async function pollMessages() {
     // First, mark ALL pending user messages as processed to prevent duplicates
     const { data: pending } = await supabase
       .from('demo_messages')
-      .select('id')
+      .select('id, content')
       .eq('session_id', SESSION_ID)
       .eq('sender', 'user')
       .eq('processed', false)
@@ -82,45 +82,45 @@ async function pollMessages() {
     // Take only the first message and mark it immediately
     const msg = pending[0];
     isProcessing = true;
+    
+    // Mark as processed immediately to prevent duplicate processing
+    await supabase.from('demo_messages').update({ processed: true }).eq('id', msg.id);
+    
+    console.log('\n📨 Message from dashboard:');
+    console.log(`   "${msg.content.substring(0, 80)}${msg.content.length > 80 ? '...' : ''}"`);
+    
+    try {
+      const response = sendToMikeOps(msg.content);
       
-      // Mark original as processed immediately when we start
-      await supabase.from('demo_messages').update({ processed: true }).eq('id', msg.id);
+      console.log('✅ Response received');
+      console.log(`   "${response.substring(0, 80)}${response.length > 80 ? '...' : ''}"`);
       
-      console.log('\n📨 Message from dashboard:');
-      console.log(`   "${msg.content.substring(0, 80)}${msg.content.length > 80 ? '...' : ''}"`);
+      // Save response to Supabase
+      await supabase.from('demo_messages').insert({
+        session_id: SESSION_ID,
+        sender: 'assistant',
+        content: response,
+        processed: false
+      });
       
-      try {
-        const response = sendToMikeOps(msg.content);
-        
-        console.log('✅ Response received');
-        console.log(`   "${response.substring(0, 80)}${response.length > 80 ? '...' : ''}"`);
-        
-        // Save response to Supabase
-        await supabase.from('demo_messages').insert({
-          session_id: SESSION_ID,
-          sender: 'assistant',
-          content: response,
-          processed: false
-        });
-        
-        console.log('💾 Response saved to Supabase');
-        
-      } catch (err) {
-        console.error('❌ Mike Ops error:', err.message);
-        
-        await supabase.from('demo_messages').insert({
-          session_id: SESSION_ID,
-          sender: 'assistant',
-          content: `Error: ${err.message}. Is Mike Ops running?`,
-          processed: false
-        });
-      }
+      console.log('💾 Response saved to Supabase');
       
-      isProcessing = false;
+    } catch (err) {
+      console.error('❌ Mike Ops error:', err.message);
+      
+      await supabase.from('demo_messages').insert({
+        session_id: SESSION_ID,
+        sender: 'assistant',
+        content: `Error: ${err.message}. Is Mike Ops running?`,
+        processed: false
+      });
     }
-
+    
+    isProcessing = false;
+    
   } catch (error) {
     console.error('Poll error:', error.message);
+    isProcessing = false;
   }
 }
 

@@ -1,11 +1,10 @@
-// HeyMike Local Connector v6
-// Uses direct CLI to send messages to Mike Ops
-// Explicitly sets config path to Mike Ops config
+// HeyMike Local Connector v7
+// Uses synchronous spawn to send messages to Mike Ops
 //
 // Keep this running while you use HeyMike dashboard
 
 const { createClient } = require('@supabase/supabase-js');
-const { spawn } = require('child_process');
+const { spawnSync } = require('child_process');
 
 // Config
 const SUPABASE_URL = 'https://uyaepyidfwkypjvsxzae.supabase.co';
@@ -20,68 +19,48 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 let isProcessing = false;
 
 console.log('╔══════════════════════════════════════════╗');
-console.log('║  HeyMike Local Connector v6            ║');
-console.log('║  Explicitly using Mike Ops config     ║');
+console.log('║  HeyMike Local Connector v7            ║');
+console.log('║  Mike Ops - synchronous              ║');
 console.log('╚══════════════════════════════════════════╝\n');
 
-// Send to Mike Ops via CLI
+// Send to Mike Ops via CLI (synchronous)
 function sendToMikeOps(message) {
-  return new Promise((resolve, reject) => {
-    console.log('🤖 Sending to Mike Ops via CLI...');
-    
-    // Create clean env with explicit config path
-    const env = {
-      HOME: process.env.HOME,
-      USER: process.env.USER,
-      PATH: process.env.PATH,
-      OPENCLAW_CONFIG_PATH: MIKE_CONFIG,
-      OPENCLAW_GATEWAY_PORT: '18790'
-    };
-    
-    const proc = spawn('openclaw', [
-      'agent',
-      '--agent', 'main',
-      '--message', message
-    ], {
-      env: env,
-      timeout: 30000
-    });
-
-    let stdout = '';
-    let stderr = '';
-
-    proc.stdout.on('data', (data) => {
-      stdout += data.toString();
-    });
-
-    proc.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        // Extract just the response part (after the --- separator if present)
-        let response = stdout.trim();
-        if (response.includes('---')) {
-          const parts = response.split('---');
-          response = parts[parts.length - 1].trim();
-        }
-        resolve(response);
-      } else {
-        reject(new Error(stderr || `Exit code: ${code}`));
-      }
-    });
-
-    proc.on('error', (err) => {
-      reject(err);
-    });
-
-    // Timeout after 30 seconds
-    setTimeout(() => {
-      proc.kill();
-      reject(new Error('Timeout (30s)'));
-    }, 30000);
+  console.log('🤖 Sending to Mike Ops via CLI...');
+  
+  // Create clean env with explicit config path
+  const env = {
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    PATH: process.env.PATH,
+    OPENCLAW_CONFIG_PATH: MIKE_CONFIG,
+    OPENCLAW_GATEWAY_PORT: '18790'
+  };
+  
+  const proc = spawnSync('openclaw', [
+    'agent',
+    '--agent', 'main',
+    '--message', message
+  ], {
+    env: env,
+    timeout: 30000
   });
+
+  if (proc.error) {
+    throw proc.error;
+  }
+  
+  if (proc.status !== 0) {
+    throw new Error(proc.stderr || `Exit code: ${proc.status}`);
+  }
+
+  // Extract just the response part (after the --- separator if present)
+  let response = proc.stdout.toString().trim();
+  if (response.includes('---')) {
+    const parts = response.split('---');
+    response = parts[parts.length - 1].trim();
+  }
+  
+  return response;
 }
 
 // Poll for new messages from dashboard
@@ -108,7 +87,7 @@ async function pollMessages() {
       console.log(`   "${msg.content.substring(0, 80)}${msg.content.length > 80 ? '...' : ''}"`);
       
       try {
-        const response = await sendToMikeOps(msg.content);
+        const response = sendToMikeOps(msg.content);
         
         console.log('✅ Response received');
         console.log(`   "${response.substring(0, 80)}${response.length > 80 ? '...' : ''}"`);
